@@ -1,6 +1,6 @@
-// main app file 
 import React from "react";
-import { Routes, Route } from "react-router-dom";
+import { Routes, Route, Navigate } from "react-router-dom";
+import { useAuth } from "./hooks/useAuth";
 
 import Login from "./pages/Auth/Login";
 import Register from "./pages/Auth/Register";
@@ -23,9 +23,25 @@ import EmpAttendance from "./pages/Employee/Attendance/Attendance";
 import EmpLeaves from "./pages/Employee/Leaves/Leaves";
 import EmpPayroll from "./pages/Employee/Payroll/Payroll";
 
+function DefaultRedirect() {
+  const { user, loading } = useAuth();
+  
+  if (loading) return <div>Loading...</div>;
+  
+  if (!user) return <Navigate to="/login" />;
+  
+  if (user.role === 'admin') {
+    return <Navigate to="/admin/dashboard" />;
+  } else {
+    return <Navigate to="/me/profile" />;
+  }
+}
+
 export default function App() {
   return (
     <Routes>
+      {/* Default route */}
+      <Route path="/" element={<DefaultRedirect />} />
 
       {/* Public Routes */}
       <Route path="/login" element={<Login />} />
@@ -133,7 +149,7 @@ export default function App() {
       />
 
       {/* Fallback */}
-      <Route path="*" element={<Login />} />
+      <Route path="*" element={<Navigate to="/" />} />
     </Routes>
   );
 }
