@@ -21,23 +21,25 @@ export default function AdminLeaves() {
   const fetchLeaves = async () => {
     try {
       const response = await api.get('/leaves/all');
-      setLeaves(response.data);
+      setLeaves(Array.isArray(response.data) ? response.data : []);
     } catch (error) {
       setError('Failed to fetch leave requests');
+      setLeaves([]);
     }
   };
 
   const filterLeaves = () => {
+    const leavesArray = Array.isArray(leaves) ? leaves : [];
     if (statusFilter === 'all') {
-      setFilteredLeaves(leaves);
+      setFilteredLeaves(leavesArray);
     } else {
-      setFilteredLeaves(leaves.filter(leave => leave.status === statusFilter));
+      setFilteredLeaves(leavesArray.filter(leave => leave.status === statusFilter));
     }
   };
 
   const handleApprove = async (leaveId) => {
     try {
-      await api.put(`/leaves/approve/${leaveId}`);
+      await api.put(`/leaves/approve/${leaveId}`, { status: 'approved' });
       setSuccess('Leave request approved successfully');
       fetchLeaves();
       setTimeout(() => setSuccess(''), 3000);
@@ -49,7 +51,7 @@ export default function AdminLeaves() {
 
   const handleReject = async (leaveId) => {
     try {
-      await api.put(`/leaves/reject/${leaveId}`);
+      await api.put(`/leaves/reject/${leaveId}`, { status: 'rejected' });
       setSuccess('Leave request rejected successfully');
       fetchLeaves();
       setTimeout(() => setSuccess(''), 3000);
@@ -118,7 +120,7 @@ export default function AdminLeaves() {
           </tr>
         </thead>
         <tbody>
-          {filteredLeaves.map((leave) => (
+          {(Array.isArray(filteredLeaves) ? filteredLeaves : []).map((leave) => (
             <tr key={leave.id}>
               <td>{leave.employee_name || 'N/A'}</td>
               <td>{leave.leave_type}</td>
@@ -131,7 +133,7 @@ export default function AdminLeaves() {
                 </div>
               </td>
               <td>{getStatusBadge(leave.status)}</td>
-              <td>{new Date(leave.created_at).toLocaleDateString()}</td>
+              <td>{new Date(leave.applied_at).toLocaleDateString()}</td>
               <td>
                 {leave.status === 'pending' && (
                   <>

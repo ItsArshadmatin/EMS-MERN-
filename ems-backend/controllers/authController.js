@@ -44,6 +44,27 @@ exports.register = async (req, res) => {
 
     console.log("User inserted:", result);
 
+    // If registering as employee, create employee profile automatically
+    if ((role || "employee") === "employee") {
+      const [employeeResult] = await pool.query(
+        `INSERT INTO employees (user_id, department_id, designation, base_salary, date_of_joining, is_active)
+         VALUES (?, NULL, 'New Employee', 30000.00, CURDATE(), 1)`,
+        [result.insertId]
+      );
+
+      // Create leave balance entries for the new employee
+      const employee_id = employeeResult.insertId;
+      const [types] = await pool.query("SELECT id, default_days FROM leave_types");
+      
+      for (let t of types) {
+        await pool.query(
+          `INSERT INTO leave_balance (employee_id, leave_type_id, total_days, used_days)
+           VALUES (?, ?, ?, 0)`,
+          [employee_id, t.id, t.default_days]
+        );
+      }
+    }
+
     // JWT payload
     const userData = {
       id: result.insertId,

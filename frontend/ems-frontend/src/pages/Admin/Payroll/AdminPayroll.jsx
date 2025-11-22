@@ -30,21 +30,24 @@ export default function AdminPayroll() {
   const fetchEmployees = async () => {
     try {
       const response = await api.get('/employees');
-      setEmployees(response.data);
+      setEmployees(Array.isArray(response.data) ? response.data : []);
     } catch (error) {
       console.error('Failed to fetch employees');
+      setEmployees([]);
     }
   };
 
   const fetchPayrollData = async () => {
     try {
       const response = await api.get('/payroll/all');
-      let data = response.data;
+      let data = Array.isArray(response.data) ? response.data : [];
       
       // Filter by month if selected
       if (selectedMonth) {
+        const [year, month] = selectedMonth.split('-');
         data = data.filter(payroll => 
-          payroll.pay_period.startsWith(selectedMonth)
+          payroll.year.toString() === year && 
+          payroll.month.toString().padStart(2, '0') === month
         );
       }
       
@@ -58,6 +61,7 @@ export default function AdminPayroll() {
       setPayrollData(data);
     } catch (error) {
       setError('Failed to fetch payroll data');
+      setPayrollData([]);
     }
   };
 
@@ -67,7 +71,14 @@ export default function AdminPayroll() {
     setError('');
 
     try {
-      await api.post('/payroll/generate', generateForm);
+      const [year, month] = generateForm.month.split('-');
+      const payrollData = {
+        employee_id: generateForm.employee_id,
+        month: parseInt(month),
+        year: parseInt(year)
+      };
+      
+      await api.post('/payroll/generate', payrollData);
       setSuccess('Payroll generated successfully');
       fetchPayrollData();
       setShowGenerateModal(false);
@@ -86,7 +97,8 @@ export default function AdminPayroll() {
       setLoading(true);
       try {
         await api.post('/payroll/generate-all', { 
-          month: selectedMonth 
+          month: selectedMonth.split('-')[1], // Extract month from YYYY-MM
+          year: selectedMonth.split('-')[0]   // Extract year from YYYY-MM
         });
         setSuccess('Payroll generated for all employees');
         fetchPayrollData();
@@ -142,7 +154,7 @@ export default function AdminPayroll() {
                   onChange={(e) => setSelectedEmployee(e.target.value)}
                 >
                   <option value="">All Employees</option>
-                  {employees.map(emp => (
+                  {(Array.isArray(employees) ? employees : []).map(emp => (
                     <option key={emp.id} value={emp.id}>{emp.name}</option>
                   ))}
                 </Form.Select>
@@ -175,23 +187,23 @@ export default function AdminPayroll() {
           <tr>
             <th>Employee</th>
             <th>Pay Period</th>
-            <th>Basic Salary</th>
-            <th>Overtime</th>
+            <th>Base Salary</th>
+            <th>Earnings</th>
             <th>Deductions</th>
             <th>Net Salary</th>
             <th>Generated On</th>
           </tr>
         </thead>
         <tbody>
-          {payrollData.map((payroll) => (
+          {(Array.isArray(payrollData) ? payrollData : []).map((payroll) => (
             <tr key={payroll.id}>
               <td>{payroll.employee_name || 'N/A'}</td>
-              <td>{payroll.pay_period}</td>
-              <td>${payroll.basic_salary}</td>
-              <td>${payroll.overtime_amount || 0}</td>
+              <td>{payroll.month}/{payroll.year}</td>
+              <td>${payroll.base_salary}</td>
+              <td>${payroll.earnings || 0}</td>
               <td>${payroll.deductions || 0}</td>
               <td><strong>${payroll.net_salary}</strong></td>
-              <td>{new Date(payroll.created_at).toLocaleDateString()}</td>
+              <td>{new Date(payroll.generated_at).toLocaleDateString()}</td>
             </tr>
           ))}
         </tbody>
@@ -218,7 +230,7 @@ export default function AdminPayroll() {
                 required
               >
                 <option value="">Select Employee</option>
-                {employees.map(emp => (
+                {(Array.isArray(employees) ? employees : []).map(emp => (
                   <option key={emp.id} value={emp.id}>{emp.name}</option>
                 ))}
               </Form.Select>

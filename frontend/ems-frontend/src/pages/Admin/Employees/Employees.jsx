@@ -10,6 +10,7 @@ export default function Employees() {
   const [editingEmployee, setEditingEmployee] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
   
   const [formData, setFormData] = useState({
@@ -30,18 +31,20 @@ export default function Employees() {
   const fetchEmployees = async () => {
     try {
       const response = await api.get('/employees');
-      setEmployees(response.data);
+      setEmployees(Array.isArray(response.data) ? response.data : []);
     } catch (error) {
       setError('Failed to fetch employees');
+      setEmployees([]);
     }
   };
 
   const fetchDepartments = async () => {
     try {
       const response = await api.get('/departments');
-      setDepartments(response.data);
+      setDepartments(Array.isArray(response.data) ? response.data : []);
     } catch (error) {
       console.error('Failed to fetch departments');
+      setDepartments([]);
     }
   };
 
@@ -53,14 +56,20 @@ export default function Employees() {
     try {
       if (editingEmployee) {
         await api.put(`/employees/${editingEmployee.id}`, formData);
+        setSuccess('Employee updated successfully!');
       } else {
-        await api.post('/employees', formData);
+        const response = await api.post('/employees/create-with-user', formData);
+        setSuccess(`Employee created successfully! 
+        Login Email: ${response.data.login_email}
+        Default Password: ${response.data.default_password}`);
       }
       
       fetchEmployees();
       handleCloseModal();
+      setTimeout(() => setSuccess(''), 5000); // Show for 5 seconds
     } catch (error) {
       setError(error.response?.data?.error || 'Operation failed');
+      setTimeout(() => setError(''), 3000);
     } finally {
       setLoading(false);
     }
@@ -104,12 +113,13 @@ export default function Employees() {
       hire_date: ''
     });
     setError('');
+    setSuccess('');
   };
 
-  const filteredEmployees = employees.filter(employee =>
+  const filteredEmployees = Array.isArray(employees) ? employees.filter(employee =>
     employee.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     employee.email.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  ) : [];
 
   return (
     <Layout>
@@ -132,6 +142,7 @@ export default function Employees() {
       </div>
 
       {error && <Alert variant="danger">{error}</Alert>}
+      {success && <Alert variant="success" style={{whiteSpace: 'pre-line'}}>{success}</Alert>}
 
       <Table responsive striped>
         <thead>
@@ -147,7 +158,7 @@ export default function Employees() {
           </tr>
         </thead>
         <tbody>
-          {filteredEmployees.map((employee) => (
+          {(Array.isArray(filteredEmployees) ? filteredEmployees : []).map((employee) => (
             <tr key={employee.id}>
               <td>{employee.name}</td>
               <td>{employee.email}</td>
@@ -228,7 +239,7 @@ export default function Employees() {
                 onChange={(e) => setFormData({...formData, department_id: e.target.value})}
               >
                 <option value="">Select Department</option>
-                {departments.map(dept => (
+                {(Array.isArray(departments) ? departments : []).map(dept => (
                   <option key={dept.id} value={dept.id}>{dept.name}</option>
                 ))}
               </Form.Select>

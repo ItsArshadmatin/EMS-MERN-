@@ -29,9 +29,10 @@ export default function Attendance() {
   const fetchAttendanceHistory = async () => {
     try {
       const response = await api.get('/attendance/history');
-      setAttendanceHistory(response.data);
+      setAttendanceHistory(Array.isArray(response.data) ? response.data : []);
     } catch (error) {
       console.error('Failed to fetch attendance history');
+      setAttendanceHistory([]);
     }
   };
 
@@ -213,7 +214,7 @@ export default function Attendance() {
                 </tr>
               </thead>
               <tbody>
-                {attendanceHistory.map((record, index) => (
+                {(Array.isArray(attendanceHistory) ? attendanceHistory : []).map((record, index) => (
                   <tr key={index}>
                     <td>{new Date(record.date).toLocaleDateString()}</td>
                     <td>{formatTime(record.check_in)}</td>

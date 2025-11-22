@@ -43,10 +43,7 @@ exports.getAllDepartments = async (req, res) => {
        WHERE is_active = 1`
     );
 
-    res.json({
-      count: rows.length,
-      departments: rows
-    });
+    res.json(rows);
 
   } catch (err) {
     console.error("Get Departments Error:", err);

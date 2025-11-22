@@ -13,16 +13,18 @@ exports.generatePayroll = async (req, res) => {
       return res.status(400).json({ error: "employee_id, month, and year are required" });
     }
 
-    // Prevent duplicates
+    // Check for existing payroll and delete if regenerating
     const [alreadyExists] = await pool.query(
       `SELECT id FROM payroll WHERE employee_id = ? AND month = ? AND year = ?`,
       [employee_id, month, year]
     );
 
     if (alreadyExists.length > 0) {
-      return res.status(409).json({
-        message: "Payroll already generated for this employee for the selected month"
-      });
+      // Delete existing payroll to regenerate
+      await pool.query(
+        `DELETE FROM payroll WHERE employee_id = ? AND month = ? AND year = ?`,
+        [employee_id, month, year]
+      );
     }
 
     // Fetch employee salary info
@@ -37,15 +39,17 @@ exports.generatePayroll = async (req, res) => {
 
     const base_salary = emp[0].base_salary;
 
-    // Example calculation (keep your logic)
+    // Calculate values to match database schema
+    const total_hours = 160; // Default 8 hours * 20 working days
+    const per_hour_rate = base_salary / total_hours;
     const earnings = base_salary;
     const deductions = 0;
     const net_salary = earnings - deductions;
 
     await pool.query(
-      `INSERT INTO payroll (employee_id, month, year, base_salary, earnings, deductions, net_salary)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [employee_id, month, year, base_salary, earnings, deductions, net_salary]
+      `INSERT INTO payroll (employee_id, month, year, base_salary, total_hours, per_hour_rate, earnings, deductions, net_salary)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [employee_id, month, year, base_salary, total_hours, per_hour_rate, earnings, deductions, net_salary]
     );
 
     res.json({
@@ -69,7 +73,7 @@ exports.generatePayroll = async (req, res) => {
 exports.getPayrollForEmployee = async (req, res) => {
   try {
     const [emp] = await pool.query(
-      "SELECT id FROM employees WHERE user_id = ?",
+      "SELECT id FROM employees WHERE user_id = ? AND is_active = 1",
       [req.user.id]
     );
 
@@ -83,7 +87,7 @@ exports.getPayrollForEmployee = async (req, res) => {
       [employee_id]
     );
 
-    return res.json({ payroll: rows });
+    return res.json(rows);
 
   } catch (error) {
     console.error("Payroll Fetch Error:", error);
@@ -97,14 +101,14 @@ exports.getPayrollForEmployee = async (req, res) => {
 exports.getAllPayroll = async (req, res) => {
   try {
     const [rows] = await pool.query(
-      `SELECT p.*, u.name 
+      `SELECT p.*, u.name AS employee_name
        FROM payroll p
        JOIN employees e ON p.employee_id = e.id
        JOIN users u ON e.user_id = u.id
        ORDER BY generated_at DESC`
     );
 
-    return res.json({ payroll: rows });
+    return res.json(rows);
 
   } catch (error) {
     console.error("Get All Payroll Error:", error);
@@ -162,7 +166,7 @@ exports.generatePayrollForAll = async (req, res) => {
     for (let emp of emps) {
       const employee_id = emp.id;
 
-      // 🔥 Prevent duplicates
+      // Check for existing payroll and delete if regenerating
       const [exists] = await pool.query(
         `SELECT id FROM payroll
          WHERE employee_id = ? AND month = ? AND year = ?`,
@@ -170,8 +174,11 @@ exports.generatePayrollForAll = async (req, res) => {
       );
 
       if (exists.length > 0) {
-        skipped.push(employee_id);
-        continue;
+        // Delete existing payroll to regenerate
+        await pool.query(
+          `DELETE FROM payroll WHERE employee_id = ? AND month = ? AND year = ?`,
+          [employee_id, month, year]
+        );
       }
 
       // Fetch salary

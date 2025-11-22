@@ -22,9 +22,10 @@ export default function Departments() {
   const fetchDepartments = async () => {
     try {
       const response = await api.get('/departments');
-      setDepartments(response.data);
+      setDepartments(Array.isArray(response.data) ? response.data : []);
     } catch (error) {
       setError('Failed to fetch departments');
+      setDepartments([]);
     }
   };
 
@@ -101,7 +102,7 @@ export default function Departments() {
           </tr>
         </thead>
         <tbody>
-          {departments.map((department) => (
+          {(Array.isArray(departments) ? departments : []).map((department) => (
             <tr key={department.id}>
               <td>{department.name}</td>
               <td>{department.description || 'No description'}</td>

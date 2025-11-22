@@ -83,12 +83,31 @@ exports.applyLeave = async (req, res) => {
 
 exports.getAllLeaves = async (req, res) => {
   try {
+    // For employees, get only their leaves
     if (req.user.role !== "admin") {
-      return res.status(403).json({ error: "Only admin can view all leaves" });
+      const [emp] = await pool.query(
+        "SELECT id FROM employees WHERE user_id = ? AND is_active = 1",
+        [req.user.id]
+      );
+
+      if (emp.length === 0) {
+        return res.status(400).json({ error: "Employee profile not found" });
+      }
+
+      const [rows] = await pool.query(`
+        SELECT l.*, lt.name AS leave_type
+        FROM leaves l
+        JOIN leave_types lt ON l.leave_type_id = lt.id
+        WHERE l.employee_id = ?
+        ORDER BY l.applied_at DESC
+      `, [emp[0].id]);
+
+      return res.json(rows);
     }
 
+    // For admin, get all leaves
     const [rows] = await pool.query(`
-      SELECT l.*, u.name, lt.name AS leave_type
+      SELECT l.*, u.name AS employee_name, lt.name AS leave_type
       FROM leaves l
       JOIN employees e ON l.employee_id = e.id
       JOIN users u ON e.user_id = u.id
@@ -96,7 +115,7 @@ exports.getAllLeaves = async (req, res) => {
       ORDER BY l.applied_at DESC
     `);
 
-    return res.json({ leaves: rows });
+    return res.json(rows);
 
   } catch (error) {
     console.error("Get All Leaves Error:", error);
@@ -255,10 +274,7 @@ exports.getLeaveBalance = async (req, res) => {
       [employee_id]
     );
 
-    return res.json({
-      employee_id,
-      balance: rows
-    });
+    return res.json(rows);
   } catch (error) {
     console.error("Get Leave Balance Error:", error);
     res.status(500).json({ error: "Server error" });

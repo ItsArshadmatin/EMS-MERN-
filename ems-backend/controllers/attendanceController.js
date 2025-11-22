@@ -203,11 +203,8 @@ exports.getHistory = async (req, res) => {
 
 exports.getMonthlySummary = async (req, res) => {
   try {
-    const { month, year } = req.query;
-
-    if (!month || !year) {
-      return res.status(400).json({ error: "month and year are required" });
-    }
+    const currentDate = new Date();
+    const { month = currentDate.getMonth() + 1, year = currentDate.getFullYear() } = req.query;
 
     // Get employee ID
     const [emp] = await pool.query(
@@ -264,6 +261,23 @@ exports.getMonthlySummary = async (req, res) => {
 
   } catch (error) {
     console.error("Monthly Summary Error:", error);
+    res.status(500).json({ error: "Server error" });
+  }
+};
+
+exports.getAllAttendance = async (req, res) => {
+  try {
+    const [records] = await pool.query(`
+      SELECT a.*, u.name as employee_name 
+      FROM attendance a 
+      JOIN employees e ON a.employee_id = e.id 
+      JOIN users u ON e.user_id = u.id 
+      ORDER BY a.date DESC, a.check_in DESC
+    `);
+    
+    res.json(records);
+  } catch (error) {
+    console.error("Get All Attendance Error:", error);
     res.status(500).json({ error: "Server error" });
   }
 };

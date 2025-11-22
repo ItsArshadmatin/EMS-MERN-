@@ -25,14 +25,18 @@ export default function Dashboard() {
         api.get('/leaves/all')
       ]);
 
+      const employees = Array.isArray(employeesRes.data) ? employeesRes.data : [];
+      const departments = Array.isArray(departmentsRes.data) ? departmentsRes.data : [];
+      const leaves = Array.isArray(leavesRes.data) ? leavesRes.data : [];
+
       setStats({
-        totalEmployees: employeesRes.data.length,
-        totalDepartments: departmentsRes.data.length,
-        pendingLeaves: leavesRes.data.filter(leave => leave.status === 'pending').length,
-        presentToday: Math.floor(Math.random() * employeesRes.data.length) // Mock data
+        totalEmployees: employees.length,
+        totalDepartments: departments.length,
+        pendingLeaves: leaves.filter(leave => leave.status === 'pending').length,
+        presentToday: Math.floor(Math.random() * employees.length) // Mock data
       });
 
-      setRecentLeaves(leavesRes.data.slice(0, 5));
+      setRecentLeaves(leaves.slice(0, 5));
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
     } finally {
@@ -115,7 +119,7 @@ export default function Dashboard() {
                     </tr>
                   </thead>
                   <tbody>
-                    {recentLeaves.map((leave) => (
+                    {(Array.isArray(recentLeaves) ? recentLeaves : []).map((leave) => (
                       <tr key={leave.id}>
                         <td>{leave.employee_name || 'N/A'}</td>
                         <td>{leave.leave_type}</td>

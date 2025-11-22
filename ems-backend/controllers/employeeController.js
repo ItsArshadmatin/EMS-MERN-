@@ -1,4 +1,77 @@
 const pool = require("../db");
+const bcrypt = require("bcryptjs");
+
+// Create employee with user account
+exports.createEmployeeWithUser = async (req, res) => {
+  const {
+    name,
+    email,
+    department_id,
+    position,
+    salary,
+    hire_date
+  } = req.body;
+
+  console.log("Create Employee Request:", req.body);
+
+  if (!name || !email) {
+    return res.status(400).json({ error: "Name and email are required" });
+  }
+
+  // Validate email format
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(email)) {
+    return res.status(400).json({ error: "Invalid email format" });
+  }
+
+  try {
+    // Check if user already exists
+    const [existingUser] = await pool.query("SELECT id FROM users WHERE email = ?", [email]);
+    if (existingUser.length > 0) {
+      return res.status(400).json({ error: "User with this email already exists" });
+    }
+
+    // Create user account with default password
+    const defaultPassword = "password123";
+    const hashedPassword = await bcrypt.hash(defaultPassword, 10);
+    
+    const [userResult] = await pool.query(
+      "INSERT INTO users (name, email, password, role) VALUES (?, ?, ?, 'employee')",
+      [name, email, hashedPassword]
+    );
+
+    // Create employee record
+    const [employeeResult] = await pool.query(
+      `INSERT INTO employees (user_id, department_id, designation, base_salary, date_of_joining)
+       VALUES (?, ?, ?, ?, ?)`,
+      [userResult.insertId, department_id || null, position || null, salary || 0, hire_date || null]
+    );
+
+    // Create leave balance entries
+    const employee_id = employeeResult.insertId;
+    const [types] = await pool.query("SELECT id, default_days FROM leave_types");
+    
+    for (let t of types) {
+      await pool.query(
+        `INSERT INTO leave_balance (employee_id, leave_type_id, total_days)
+         VALUES (?, ?, ?)`,
+        [employee_id, t.id, t.default_days]
+      );
+    }
+
+    res.json({
+      message: "Employee created successfully",
+      employee_id: employee_id,
+      user_id: userResult.insertId,
+      default_password: defaultPassword,
+      login_email: email
+    });
+  } catch (err) {
+    console.error("Create Employee With User Error:", err);
+    console.error("Request body:", req.body);
+    res.status(500).json({ error: "Server error: " + err.message });
+  }
+};
 
 // Create employee profile for an existing user
 exports.createEmployee = async (req, res) => {
@@ -67,7 +140,7 @@ exports.getAllEmployees = async (req, res) => {
   try {
     const [rows] = await pool.query(
       `SELECT 
-    e.id AS employee_id,
+    e.id,
     u.id AS user_id,
     u.name,
     u.email,
@@ -87,10 +160,7 @@ WHERE e.is_active = 1
 
     );
 
-    res.json({
-      count: rows.length,
-      employees: rows
-    });
+    res.json(rows);
   } catch (err) {
     console.error("Get All Employees Error:", err);
     res.status(500).json({ error: "Server error" });
@@ -293,3 +363,31 @@ exports.searchEmployees = async (req, res) => {
   }
 };
 
+
+// Reset employee password (Admin only)
+exports.resetEmployeePassword = async (req, res) => {
+  try {
+    const { employee_id } = req.params;
+    const newPassword = "password123"; // Default password
+    
+    // Get user_id from employee
+    const [emp] = await pool.query("SELECT user_id FROM employees WHERE id = ?", [employee_id]);
+    if (emp.length === 0) {
+      return res.status(404).json({ error: "Employee not found" });
+    }
+    
+    // Hash new password
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    
+    // Update user password
+    await pool.query("UPDATE users SET password = ? WHERE id = ?", [hashedPassword, emp[0].user_id]);
+    
+    res.json({
+      message: "Password reset successfully",
+      new_password: newPassword
+    });
+  } catch (error) {
+    console.error("Reset Password Error:", error);
+    res.status(500).json({ error: "Server error" });
+  }
+};

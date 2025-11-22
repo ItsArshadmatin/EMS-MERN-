@@ -5,14 +5,15 @@ import api from '../../../api/axios';
 
 export default function Leaves() {
   const [leaves, setLeaves] = useState([]);
-  const [leaveBalance, setLeaveBalance] = useState(null);
+  const [leaveBalance, setLeaveBalance] = useState([]);
+  const [leaveTypes, setLeaveTypes] = useState([]);
   const [showModal, setShowModal] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
 
   const [formData, setFormData] = useState({
-    leave_type: 'sick',
+    leave_type_id: '',
     start_date: '',
     end_date: '',
     reason: ''
@@ -26,18 +27,22 @@ export default function Leaves() {
   const fetchLeaves = async () => {
     try {
       const response = await api.get('/leaves/all');
-      setLeaves(response.data);
+      setLeaves(Array.isArray(response.data) ? response.data : []);
     } catch (error) {
       console.error('Failed to fetch leaves');
+      setLeaves([]);
     }
   };
 
   const fetchLeaveBalance = async () => {
     try {
       const response = await api.get('/leaves/balance');
-      setLeaveBalance(response.data);
+      setLeaveBalance(Array.isArray(response.data) ? response.data : []);
+      setLeaveTypes(Array.isArray(response.data) ? response.data : []);
     } catch (error) {
       console.error('Failed to fetch leave balance');
+      setLeaveBalance([]);
+      setLeaveTypes([]);
     }
   };
 
@@ -70,7 +75,7 @@ export default function Leaves() {
   const handleCloseModal = () => {
     setShowModal(false);
     setFormData({
-      leave_type: 'sick',
+      leave_type_id: '',
       start_date: '',
       end_date: '',
       reason: ''
@@ -134,7 +139,7 @@ export default function Leaves() {
                     </tr>
                   </thead>
                   <tbody>
-                    {leaves.map((leave) => (
+                    {(Array.isArray(leaves) ? leaves : []).map((leave) => (
                       <tr key={leave.id}>
                         <td>{leave.leave_type}</td>
                         <td>{new Date(leave.start_date).toLocaleDateString()}</td>
@@ -159,20 +164,16 @@ export default function Leaves() {
               <h5 className="mb-0">Leave Balance</h5>
             </Card.Header>
             <Card.Body>
-              {leaveBalance ? (
+              {Array.isArray(leaveBalance) && leaveBalance.length > 0 ? (
                 <>
-                  <div className="mb-3">
-                    <strong>Annual Leave:</strong>
-                    <div className="text-muted">{leaveBalance.annual_balance || 0} days remaining</div>
-                  </div>
-                  <div className="mb-3">
-                    <strong>Sick Leave:</strong>
-                    <div className="text-muted">{leaveBalance.sick_balance || 0} days remaining</div>
-                  </div>
-                  <div className="mb-3">
-                    <strong>Personal Leave:</strong>
-                    <div className="text-muted">{leaveBalance.personal_balance || 0} days remaining</div>
-                  </div>
+                  {leaveBalance.map(balance => (
+                    <div key={balance.leave_type_id} className="mb-3">
+                      <strong>{balance.leave_type}:</strong>
+                      <div className="text-muted">
+                        {balance.remaining} days remaining (Used: {balance.used_days}/{balance.total_days})
+                      </div>
+                    </div>
+                  ))}
                 </>
               ) : (
                 <p className="text-muted">Leave balance information not available</p>
@@ -194,16 +195,27 @@ export default function Leaves() {
             <Form.Group className="mb-3">
               <Form.Label>Leave Type *</Form.Label>
               <Form.Select
-                value={formData.leave_type}
-                onChange={(e) => setFormData({...formData, leave_type: e.target.value})}
+                value={formData.leave_type_id}
+                onChange={(e) => setFormData({...formData, leave_type_id: e.target.value})}
                 required
               >
-                <option value="sick">Sick Leave</option>
-                <option value="annual">Annual Leave</option>
-                <option value="personal">Personal Leave</option>
-                <option value="emergency">Emergency Leave</option>
-                <option value="maternity">Maternity Leave</option>
-                <option value="paternity">Paternity Leave</option>
+                <option value="">Select Leave Type</option>
+                {(Array.isArray(leaveTypes) && leaveTypes.length > 0) ? (
+                  leaveTypes.map(type => (
+                    <option key={type.leave_type_id} value={type.leave_type_id}>
+                      {type.leave_type} (Remaining: {type.remaining})
+                    </option>
+                  ))
+                ) : (
+                  // Fallback options if API fails
+                  <>
+                    <option value="1">Annual Leave</option>
+                    <option value="2">Sick Leave</option>
+                    <option value="3">Casual Leave</option>
+                    <option value="4">Maternity Leave</option>
+                    <option value="5">Paternity Leave</option>
+                  </>
+                )}
               </Form.Select>
             </Form.Group>
 

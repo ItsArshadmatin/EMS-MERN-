@@ -16,30 +16,31 @@ export default function Payroll() {
     setLoading(true);
     try {
       const response = await api.get('/payroll/my');
-      let data = response.data;
+      let data = Array.isArray(response.data) ? response.data : [];
       
       // Filter by selected year
       data = data.filter(payroll => 
-        new Date(payroll.pay_period).getFullYear() === parseInt(selectedYear)
+        parseInt(payroll.year) === parseInt(selectedYear)
       );
       
       setPayrollData(data);
     } catch (error) {
       console.error('Failed to fetch payroll data');
+      setPayrollData([]);
     } finally {
       setLoading(false);
     }
   };
 
   const calculateYearlyTotal = () => {
-    return payrollData.reduce((total, payroll) => total + parseFloat(payroll.net_salary || 0), 0);
+    const dataArray = Array.isArray(payrollData) ? payrollData : [];
+    return dataArray.reduce((total, payroll) => total + parseFloat(payroll.net_salary || 0), 0);
   };
 
-  const getMonthName = (dateString) => {
-    return new Date(dateString).toLocaleDateString('en-US', { 
-      year: 'numeric', 
-      month: 'long' 
-    });
+  const getMonthName = (month, year) => {
+    const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December'];
+    return `${monthNames[month - 1]} ${year}`;
   };
 
   const getCurrentYear = () => new Date().getFullYear();
@@ -82,19 +83,19 @@ export default function Payroll() {
                   <thead>
                     <tr>
                       <th>Pay Period</th>
-                      <th>Basic Salary</th>
-                      <th>Overtime</th>
+                      <th>Base Salary</th>
+                      <th>Earnings</th>
                       <th>Deductions</th>
                       <th>Net Salary</th>
                       <th>Status</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {payrollData.map((payroll) => (
+                    {(Array.isArray(payrollData) ? payrollData : []).map((payroll) => (
                       <tr key={payroll.id}>
-                        <td>{getMonthName(payroll.pay_period)}</td>
-                        <td>${payroll.basic_salary}</td>
-                        <td>${payroll.overtime_amount || 0}</td>
+                        <td>{getMonthName(payroll.month, payroll.year)}</td>
+                        <td>${payroll.base_salary}</td>
+                        <td>${payroll.earnings || 0}</td>
                         <td>${payroll.deductions || 0}</td>
                         <td><strong>${payroll.net_salary}</strong></td>
                         <td>
@@ -150,13 +151,13 @@ export default function Payroll() {
               {payrollData.length > 0 ? (
                 <>
                   <div className="mb-2">
-                    <strong>Period:</strong> {getMonthName(payrollData[0].pay_period)}
+                    <strong>Period:</strong> {getMonthName(payrollData[0].month, payrollData[0].year)}
                   </div>
                   <div className="mb-2">
-                    <strong>Basic Salary:</strong> ${payrollData[0].basic_salary}
+                    <strong>Base Salary:</strong> ${payrollData[0].base_salary}
                   </div>
                   <div className="mb-2">
-                    <strong>Overtime:</strong> ${payrollData[0].overtime_amount || 0}
+                    <strong>Earnings:</strong> ${payrollData[0].earnings || 0}
                   </div>
                   <div className="mb-2">
                     <strong>Deductions:</strong> ${payrollData[0].deductions || 0}
